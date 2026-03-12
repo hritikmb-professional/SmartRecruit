@@ -1,74 +1,24 @@
-import { GoogleGenerativeAI } from "@google/generative-ai"
-import { verifyGitHub } from "./githubVerifier"
-
-const genAI = new GoogleGenerativeAI(
-  process.env.GEMINI_API_KEY as string
-)
-
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.analyzeResumeWithLLM = void 0;
+const generative_ai_1 = require("@google/generative-ai");
+const githubVerifier_1 = require("./githubVerifier");
+const genAI = new generative_ai_1.GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({
-  model: "gemini-2.0-flash"
-})
-
-export type LLMResumeResult = {
-  name: string
-  email: string
-  phone: string
-  skills: string[]
-  matchedSkills: string[]
-  missingSkills: string[]
-  matchScore: number
-  summary: string
-  experience: string
-  education: string[]
-  scoreBreakdown: {
-    skillsMatch: number
-    experienceRelevance: number
-    educationMatch: number
-    projectRelevance: number
-    overallExperience: number
-  }
-  githubVerification?: {
-    githubFound: boolean
-    githubUrl?: string
-    contributionBonus: number
-    verificationScore: number
-    projectsVerified: string[]
-    topRepos?: {
-      name: string
-      description: string | null
-      language: string | null
-      stars: number
-      forks: number
-    }[]
-    topLanguages?: { language: string; percentage: number }[]
-    totals?: { stars: number; forks: number }
-    lastActiveAt?: string | null
-    activitySummary?: {
-      prOpened: number
-      prMerged: number
-      issuesOpened: number
-      commits: number
-      repositoriesContributedTo: number
-    }
-  }
-}
-
+    model: "gemini-2.0-flash"
+});
 /**
  * Safely extract JSON from LLM output
  */
-const extractJSON = (text: string): any => {
-  const match = text.match(/\{[\s\S]*\}/)
-  if (!match) {
-    throw new Error("No JSON object found in LLM response")
-  }
-  return JSON.parse(match[0])
-}
-
-export const analyzeResumeWithLLM = async (
-  resumeText: string,
-  jobDescription: string
-): Promise<LLMResumeResult> => {
-  const prompt = `
+const extractJSON = (text) => {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) {
+        throw new Error("No JSON object found in LLM response");
+    }
+    return JSON.parse(match[0]);
+};
+const analyzeResumeWithLLM = async (resumeText, jobDescription) => {
+    const prompt = `
 You are an AI recruitment assistant with expertise in candidate evaluation.
 
 IMPORTANT RULES:
@@ -161,48 +111,41 @@ Resume:
 
 Job Description:
 """${jobDescription}"""
-`
-
-  const result = await model.generateContent(prompt)
-  const rawText = result.response.text()
-
-  let analysisResult: LLMResumeResult
-
-  try {
-    analysisResult = extractJSON(rawText)
-  } catch (err) {
-    console.error("RAW LLM OUTPUT:\n", rawText)
-    throw new Error("LLM returned invalid JSON")
-  }
-
-  // Perform GitHub verification
-  try {
-    const githubVerification = await verifyGitHub(resumeText)
-    
-    if (githubVerification.githubFound) {
-      analysisResult.githubVerification = {
-        githubFound: true,
-        githubUrl: githubVerification.githubUrl,
-        contributionBonus: githubVerification.contributionBonus,
-        verificationScore: githubVerification.verificationScore,
-        projectsVerified: githubVerification.projectsVerified,
-        topRepos: githubVerification.topRepos,
-        topLanguages: githubVerification.topLanguages,
-        totals: githubVerification.totals,
-        lastActiveAt: githubVerification.lastActiveAt,
-        activitySummary: githubVerification.activitySummary
-      }
-
-      // Add GitHub bonus to match score
-      analysisResult.matchScore = Math.min(
-        100,
-        analysisResult.matchScore + githubVerification.contributionBonus
-      )
+`;
+    const result = await model.generateContent(prompt);
+    const rawText = result.response.text();
+    let analysisResult;
+    try {
+        analysisResult = extractJSON(rawText);
     }
-  } catch (err) {
-    console.error("GitHub verification failed:", err)
-    // Continue without GitHub data
-  }
-
-  return analysisResult
-}
+    catch (err) {
+        console.error("RAW LLM OUTPUT:\n", rawText);
+        throw new Error("LLM returned invalid JSON");
+    }
+    // Perform GitHub verification
+    try {
+        const githubVerification = await (0, githubVerifier_1.verifyGitHub)(resumeText);
+        if (githubVerification.githubFound) {
+            analysisResult.githubVerification = {
+                githubFound: true,
+                githubUrl: githubVerification.githubUrl,
+                contributionBonus: githubVerification.contributionBonus,
+                verificationScore: githubVerification.verificationScore,
+                projectsVerified: githubVerification.projectsVerified,
+                topRepos: githubVerification.topRepos,
+                topLanguages: githubVerification.topLanguages,
+                totals: githubVerification.totals,
+                lastActiveAt: githubVerification.lastActiveAt,
+                activitySummary: githubVerification.activitySummary
+            };
+            // Add GitHub bonus to match score
+            analysisResult.matchScore = Math.min(100, analysisResult.matchScore + githubVerification.contributionBonus);
+        }
+    }
+    catch (err) {
+        console.error("GitHub verification failed:", err);
+        // Continue without GitHub data
+    }
+    return analysisResult;
+};
+exports.analyzeResumeWithLLM = analyzeResumeWithLLM;

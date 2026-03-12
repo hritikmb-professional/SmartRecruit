@@ -2,7 +2,8 @@ import express from "express"
 import {
   createJob,
   getMyJobs,
-  getRankedCandidates
+  getRankedCandidates,
+  completeRecruitment
 } from "../controllers/jobController"
 import { authenticate } from "../middleware/auth"
 
@@ -16,5 +17,8 @@ router.get("/", authenticate, getMyJobs)
 
 // Get ranked candidates for a job
 router.get("/:jobId/candidates", authenticate, getRankedCandidates)
+
+// Complete recruitment - send status emails to all candidates
+router.post("/:jobId/complete", authenticate, completeRecruitment)
 
 export default router

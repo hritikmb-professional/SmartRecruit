@@ -2,6 +2,7 @@ import { Response } from "express"
 import Job from "../models/Job"
 import { AuthRequest } from "../middleware/auth"
 import Candidate from "../models/Candidate"
+import { sendRecruitmentStatusEmail } from "../services/emailservice"
 
 
 /**
@@ -70,6 +71,69 @@ export const getRankedCandidates = async (req: AuthRequest, res: Response) => {
   } catch (err) {
     return res.status(500).json({
       message: "Failed to fetch candidates",
+      error: String(err)
+    })
+  }
+}
+
+/**
+ * Complete recruitment - send status emails to all candidates
+ */
+export const completeRecruitment = async (req: AuthRequest, res: Response) => {
+  try {
+    const { jobId } = req.params
+
+    if (!req.userId) {
+      return res.status(401).json({ message: "Unauthorized" })
+    }
+
+    // Get the job
+    const job = await Job.findById(jobId)
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" })
+    }
+
+    // Get all candidates for this job
+    const candidates = await Candidate.find({ job: jobId })
+
+    if (candidates.length === 0) {
+      return res.status(400).json({ message: "No candidates found for this job" })
+    }
+
+    // Send emails to candidates (excluding 'applied' status)
+    const emailPromises = candidates
+      .filter(c => c.status && c.status !== "applied" && c.email)
+      .map(async (candidate) => {
+        try {
+          await sendRecruitmentStatusEmail(
+            candidate.name,
+            candidate.email,
+            job.title,
+            candidate.status
+          )
+          return { success: true, email: candidate.email, name: candidate.name }
+        } catch (err) {
+          console.error(`Failed to send email to ${candidate.email}:`, err)
+          return { success: false, email: candidate.email, name: candidate.name, error: String(err) }
+        }
+      })
+
+    const results = await Promise.all(emailPromises)
+    
+    const successCount = results.filter(r => r.success).length
+    const failCount = results.filter(r => !r.success).length
+
+    return res.status(200).json({
+      message: "Recruitment completed",
+      totalCandidates: candidates.length,
+      emailsSent: successCount,
+      emailsFailed: failCount,
+      results
+    })
+  } catch (err) {
+    console.error("COMPLETE RECRUITMENT ERROR:", err)
+    return res.status(500).json({
+      message: "Failed to complete recruitment",
       error: String(err)
     })
   }

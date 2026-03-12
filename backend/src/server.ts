@@ -9,6 +9,8 @@ import path from "path"
 import resumeRoutes from "./routes/resumeRoutes"
 import candidateRoutes from "./routes/candidateRoutes"
 import authRoutes from "./routes/authRoutes"
+import interviewRoutes from "./routes/interviewRoutes"
+import { initInterviewReminders } from "./services/interviewReminder"
 
 
 const app = express()
@@ -30,6 +32,7 @@ app.get("/debug", (_req, res) => {
 app.use("/api/auth", authRoutes)
 app.use("/api/jobs", jobRoutes)
 app.use("/api/resumes", resumeRoutes)
+app.use("/api/interviews", interviewRoutes)
 
 // Health check
 app.get("/api/health", (_req, res) => {
@@ -40,6 +43,7 @@ mongoose
   .connect(process.env.MONGODB_URI as string)
   .then(() => {
     console.log("MongoDB connected")
+    initInterviewReminders()
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`)
     })

@@ -30,12 +30,8 @@ export const uploadResume = async (req: AuthRequest, res: Response) => {
         job.description
       )
 
-      // 🔢 NORMALIZE SCORE (0–1 → 0–100)
-      const rawScore = llmResult.matchScore ?? 0
-      const normalizedScore =
-        rawScore <= 1
-          ? Math.round(rawScore * 100)
-          : Math.round(rawScore)
+      // matchScore should already be 0-100 from the new scoring system
+      const normalizedScore = Math.round(llmResult.matchScore)
 
       const existingCandidate = llmResult.email
         ? await Candidate.findOne({
@@ -49,13 +45,23 @@ export const uploadResume = async (req: AuthRequest, res: Response) => {
         existingCandidate.matchedSkills = llmResult.matchedSkills || []
         existingCandidate.missingSkills = llmResult.missingSkills || []
         existingCandidate.summary = llmResult.summary || ""
+        existingCandidate.experience = llmResult.experience || ""
+        existingCandidate.education = llmResult.education || []
         existingCandidate.matchScore = normalizedScore
+        existingCandidate.scoreBreakdown = llmResult.scoreBreakdown || {
+          skillsMatch: 0,
+          experienceRelevance: 0,
+          educationMatch: 0,
+          projectRelevance: 0,
+          overallExperience: 0
+        }
+        existingCandidate.githubVerification = llmResult.githubVerification
         existingCandidate.resumeText = resumeText
         existingCandidate.resumePath = file.path
 
         await existingCandidate.save()
         updatedCandidates.push(existingCandidate)
-        continue // ✅ IMPORTANT: continue loop, don’t return
+        continue
       }
 
       const candidate = await Candidate.create({
@@ -66,9 +72,19 @@ export const uploadResume = async (req: AuthRequest, res: Response) => {
         matchedSkills: llmResult.matchedSkills || [],
         missingSkills: llmResult.missingSkills || [],
         summary: llmResult.summary || "",
+        experience: llmResult.experience || "",
+        education: llmResult.education || [],
         resumeText,
         resumePath: file.path,
         matchScore: normalizedScore,
+        scoreBreakdown: llmResult.scoreBreakdown || {
+          skillsMatch: 0,
+          experienceRelevance: 0,
+          educationMatch: 0,
+          projectRelevance: 0,
+          overallExperience: 0
+        },
+        githubVerification: llmResult.githubVerification,
         job: jobId
       })
 

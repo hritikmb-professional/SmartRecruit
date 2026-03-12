@@ -66,7 +66,7 @@ export const updateCandidateStatus = async (req: Request, res: Response) => {
     const { candidateId } = req.params
     const { status } = req.body
 
-    const allowed = ["applied", "shortlisted", "rejected", "hired"]
+    const allowed = ["applied", "promote_to_oa", "promote_to_hr", "rejected"]
     if (!allowed.includes(status)) {
       return res.status(400).json({ message: "Invalid status" })
     }
@@ -82,7 +82,12 @@ export const updateCandidateStatus = async (req: Request, res: Response) => {
     }
 
     res.json(candidate)
-  } catch (err) {
-    res.status(500).json({ message: "Failed to update status" })
+  } catch (err: any) {
+    console.error("UPDATE CANDIDATE STATUS ERROR:", err)
+    const message =
+      err?.name === "CastError"
+        ? "Invalid candidate ID"
+        : err?.message || "Failed to update status"
+    res.status(500).json({ message })
   }
 }
